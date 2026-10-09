@@ -1,0 +1,776 @@
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Scanner;
+public class TN22_MIDTERMLAB_LIWAG {
+
+    private final Scanner scanner = new Scanner(System.in);
+    private final LearningMonitor monitor = new LearningMonitor();
+
+    public static void main(String[] args) {
+        new DebugYourLearningApp().run();
+    }
+
+    public void run() {
+        int choice;
+
+        do {
+            displayMenu();
+            choice = readInt("Enter your choice: ");
+
+            switch (choice) {
+                case 1:
+                    registerStudent();
+                    break;
+
+                case 2:
+                    recordInitialAssessment();
+                    break;
+
+                case 3:
+                    viewStudentReport();
+                    break;
+
+                case 4:
+                    recordFollowUpAssessment();
+                    break;
+
+                case 5:
+                    listStudents();
+                    break;
+
+                case 6:
+                    System.out.println(
+                            "Thank you for using Debug Your Learning.");
+                    break;
+
+                default:
+                    System.out.println(
+                            "Invalid choice. Please choose from 1 to 6.");
+            }
+
+        } while (choice != 6);
+
+        scanner.close();
+    }
+
+    private void displayMenu() {
+        System.out.println("\n========================================");
+        System.out.println("          DEBUG YOUR LEARNING");
+        System.out.println("========================================");
+        System.out.println("1. Register Student");
+        System.out.println("2. Record Initial Assessment");
+        System.out.println("3. View Student Report");
+        System.out.println("4. Record Follow-Up Assessment");
+        System.out.println("5. View All Students");
+        System.out.println("6. Exit");
+        System.out.println("========================================");
+    }
+
+    private void registerStudent() {
+        System.out.println("\n--- Register Student ---");
+
+        String id = readText("Student ID: ");
+        String name = readText("Student name: ");
+        String course = readText("Course or section: ");
+
+        Student student = new Student(id, name, course);
+
+        if (monitor.registerStudent(student)) {
+            System.out.println("Student registered successfully.");
+        } else {
+            System.out.println("A student with that ID already exists.");
+        }
+    }
+
+    private void recordInitialAssessment() {
+        Student student = findStudentFromInput();
+
+        if (student == null) {
+            return;
+        }
+
+        System.out.println("\nEnter scores from 0 to 100.");
+
+        for (Concept concept : Concept.values()) {
+            double score = readScore(
+                    "Initial score for "
+                    + concept.getDisplayName()
+                    + ": ");
+
+            student.addPerformance(
+                    new ConceptPerformance(concept, score));
+        }
+
+        System.out.println("Initial assessment saved.");
+    }
+
+    private void recordFollowUpAssessment() {
+        Student student = findStudentFromInput();
+
+        if (student == null) {
+            return;
+        }
+
+        if (student.getPerformances().isEmpty()) {
+            System.out.println(
+                    "Please record the initial assessment first.");
+            return;
+        }
+
+        System.out.println("\nEnter follow-up scores from 0 to 100.");
+
+        for (Concept concept : Concept.values()) {
+            double score = readScore(
+                    "Follow-up score for "
+                    + concept.getDisplayName()
+                    + ": ");
+
+            student.recordFollowUpScore(concept, score);
+        }
+
+        System.out.println("Follow-up assessment saved.");
+    }
+
+    private void viewStudentReport() {
+        Student student = findStudentFromInput();
+
+        if (student == null) {
+            return;
+        }
+
+        System.out.println("\n========== STUDENT REPORT ==========");
+        System.out.println("ID: " + student.getStudentId());
+        System.out.println("Name: " + student.getName());
+        System.out.println("Course or Section: "
+                + student.getCourse());
+
+        System.out.println(student.getProgressSummary());
+
+        System.out.println("\nConcept Performance:");
+
+        for (ConceptPerformance performance
+                : student.getPerformances()) {
+
+            String followUp;
+
+            if (performance.getFollowUpScore() == null) {
+                followUp = "Not recorded";
+            } else {
+                followUp = String.format(
+                        "%.2f",
+                        performance.getFollowUpScore());
+            }
+
+            System.out.printf(
+                    "- %-18s Initial: %6.2f "
+                    + "| Follow-up: %10s "
+                    + "| Current: %6.2f "
+                    + "| %s%n",
+
+                    performance.getConcept().getDisplayName(),
+                    performance.getInitialScore(),
+                    followUp,
+                    performance.getCurrentScore(),
+                    performance.getStatus());
+        }
+
+        ConceptPerformance weakest =
+                student.getWeakestConcept();
+
+        if (weakest != null) {
+            System.out.println(
+                    "\nLearning Gap: "
+                    + weakest.getConcept().getDisplayName());
+        }
+
+        printRecommendations(student);
+    }
+
+    private void printRecommendations(Student student) {
+        List<LearningResource> recommendations =
+                monitor.getRecommendations(student);
+
+        System.out.println("\nTargeted Recommendations:");
+
+        if (recommendations.isEmpty()) {
+            System.out.println(
+                    "No urgent learning gaps detected.");
+            return;
+        }
+
+        for (LearningResource resource : recommendations) {
+            System.out.println("\n" + resource.display());
+        }
+    }
+
+    private void listStudents() {
+        System.out.println(
+                "\n========== REGISTERED STUDENTS ==========");
+
+        if (monitor.getStudents().isEmpty()) {
+            System.out.println("No students registered yet.");
+            return;
+        }
+
+        for (Student student : monitor.getStudents()) {
+            System.out.printf(
+                    "%s | %s | %s | %s%n",
+
+                    student.getStudentId(),
+                    student.getName(),
+                    student.getCourse(),
+                    student.getProgressSummary());
+        }
+    }
+
+    private Student findStudentFromInput() {
+        String id = readText("Enter student ID: ");
+        Student student = monitor.findStudent(id);
+
+        if (student == null) {
+            System.out.println("Student not found.");
+        }
+
+        return student;
+    }
+
+    private String readText(String prompt) {
+        System.out.print(prompt);
+        return scanner.nextLine().trim();
+    }
+
+    private int readInt(String prompt) {
+        while (true) {
+            try {
+                System.out.print(prompt);
+                return Integer.parseInt(scanner.nextLine().trim());
+
+            } catch (NumberFormatException exception) {
+                System.out.println(
+                        "Please enter a whole number.");
+            }
+        }
+    }
+
+    private double readScore(String prompt) {
+        while (true) {
+            try {
+                System.out.print(prompt);
+
+                double score = Double.parseDouble(
+                        scanner.nextLine().trim());
+
+                if (score >= 0 && score <= 100) {
+                    return score;
+                }
+
+                System.out.println(
+                        "Score must be from 0 to 100.");
+
+            } catch (NumberFormatException exception) {
+                System.out.println(
+                        "Please enter a valid score.");
+            }
+        }
+    }
+
+    // =========================
+    // ENUM
+    // =========================
+
+    enum Concept {
+        LOOPS("Loops"),
+        ARRAYS("Arrays"),
+        METHODS("Methods"),
+        PROBLEM_SOLVING("Problem Solving");
+
+        private final String displayName;
+
+        Concept(String displayName) {
+            this.displayName = displayName;
+        }
+
+        public String getDisplayName() {
+            return displayName;
+        }
+    }
+
+    // =========================
+    // INTERFACE
+    // =========================
+
+    interface ProgressTrackable {
+        void recordFollowUpScore(
+                Concept concept,
+                double score);
+
+        String getProgressSummary();
+    }
+
+    // =========================
+    // ABSTRACT CLASS
+    // =========================
+
+    abstract static class LearningResource {
+
+        private final String title;
+        private final Concept concept;
+
+        public LearningResource(
+                String title,
+                Concept concept) {
+
+            this.title = title;
+            this.concept = concept;
+        }
+
+        public String getTitle() {
+            return title;
+        }
+
+        public Concept getConcept() {
+            return concept;
+        }
+
+        public abstract String getResourceType();
+
+        public abstract String getContent();
+
+        public String display() {
+            return "[" + getResourceType() + "] "
+                    + title
+                    + "\nConcept: "
+                    + concept.getDisplayName()
+                    + "\n"
+                    + getContent();
+        }
+    }
+
+    // =========================
+    // INHERITANCE CLASS 1
+    // =========================
+
+    static class ExplanationResource
+            extends LearningResource {
+
+        private final String explanation;
+
+        public ExplanationResource(
+                String title,
+                Concept concept,
+                String explanation) {
+
+            super(title, concept);
+            this.explanation = explanation;
+        }
+
+        @Override
+        public String getResourceType() {
+            return "Explanation";
+        }
+
+        @Override
+        public String getContent() {
+            return explanation;
+        }
+    }
+
+    // =========================
+    // INHERITANCE CLASS 2
+    // =========================
+
+    static class PracticeActivityResource
+            extends LearningResource {
+
+        private final String activity;
+
+        public PracticeActivityResource(
+                String title,
+                Concept concept,
+                String activity) {
+
+            super(title, concept);
+            this.activity = activity;
+        }
+
+        @Override
+        public String getResourceType() {
+            return "Practice Activity";
+        }
+
+        @Override
+        public String getContent() {
+            return activity;
+        }
+    }
+
+    // =========================
+    // CONCEPT PERFORMANCE
+    // =========================
+
+    static class ConceptPerformance {
+
+        private final Concept concept;
+        private double initialScore;
+        private Double followUpScore;
+
+        public ConceptPerformance(
+                Concept concept,
+                double initialScore) {
+
+            this.concept = concept;
+            setInitialScore(initialScore);
+        }
+
+        public Concept getConcept() {
+            return concept;
+        }
+
+        public double getInitialScore() {
+            return initialScore;
+        }
+
+        public void setInitialScore(double initialScore) {
+            validateScore(initialScore);
+            this.initialScore = initialScore;
+        }
+
+        public Double getFollowUpScore() {
+            return followUpScore;
+        }
+
+        public void setFollowUpScore(Double followUpScore) {
+            if (followUpScore != null) {
+                validateScore(followUpScore);
+            }
+
+            this.followUpScore = followUpScore;
+        }
+
+        public double getCurrentScore() {
+            if (followUpScore == null) {
+                return initialScore;
+            }
+
+            return followUpScore;
+        }
+
+        public boolean isWeakness() {
+            return getCurrentScore() < 75;
+        }
+
+        public String getStatus() {
+            if (getCurrentScore() >= 90) {
+                return "Strong";
+            } else if (getCurrentScore() >= 75) {
+                return "Developing";
+            } else {
+                return "Needs Support";
+            }
+        }
+
+        public double getImprovement() {
+            if (followUpScore == null) {
+                return 0;
+            }
+
+            return followUpScore - initialScore;
+        }
+
+        private void validateScore(double score) {
+            if (score < 0 || score > 100) {
+                throw new IllegalArgumentException(
+                        "Score must be from 0 to 100.");
+            }
+        }
+    }
+
+    // =========================
+    // STUDENT CLASS
+    // =========================
+
+    static class Student implements ProgressTrackable {
+
+        private final String studentId;
+        private String name;
+        private String course;
+        private final List<ConceptPerformance> performances;
+
+        public Student(
+                String studentId,
+                String name,
+                String course) {
+
+            this.studentId = studentId;
+            this.name = name;
+            this.course = course;
+            this.performances = new ArrayList<>();
+        }
+
+        public String getStudentId() {
+            return studentId;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public String getCourse() {
+            return course;
+        }
+
+        public void setCourse(String course) {
+            this.course = course;
+        }
+
+        public List<ConceptPerformance> getPerformances() {
+            return new ArrayList<>(performances);
+        }
+
+        public void addPerformance(
+                ConceptPerformance performance) {
+
+            ConceptPerformance existing =
+                    getPerformance(performance.getConcept());
+
+            if (existing != null) {
+                performances.remove(existing);
+            }
+
+            performances.add(performance);
+        }
+
+        public ConceptPerformance getPerformance(
+                Concept concept) {
+
+            for (ConceptPerformance performance
+                    : performances) {
+
+                if (performance.getConcept() == concept) {
+                    return performance;
+                }
+            }
+
+            return null;
+        }
+
+        @Override
+        public void recordFollowUpScore(
+                Concept concept,
+                double score) {
+
+            ConceptPerformance performance =
+                    getPerformance(concept);
+
+            if (performance == null) {
+                throw new IllegalStateException(
+                        "Initial assessment is required first.");
+            }
+
+            performance.setFollowUpScore(score);
+        }
+
+        public double getAverageScore() {
+            if (performances.isEmpty()) {
+                return 0;
+            }
+
+            double total = 0;
+
+            for (ConceptPerformance performance
+                    : performances) {
+
+                total += performance.getCurrentScore();
+            }
+
+            return total / performances.size();
+        }
+
+        public ConceptPerformance getWeakestConcept() {
+            ConceptPerformance weakest = null;
+
+            for (ConceptPerformance performance
+                    : performances) {
+
+                if (weakest == null
+                        || performance.getCurrentScore()
+                        < weakest.getCurrentScore()) {
+
+                    weakest = performance;
+                }
+            }
+
+            return weakest;
+        }
+
+        @Override
+        public String getProgressSummary() {
+            if (performances.isEmpty()) {
+                return "No assessment recorded.";
+            }
+
+            int improved = 0;
+
+            for (ConceptPerformance performance
+                    : performances) {
+
+                if (performance.getFollowUpScore() != null
+                        && performance.getImprovement() > 0) {
+
+                    improved++;
+                }
+            }
+
+            return String.format(
+                    "Current average: %.2f | Improved: %d/%d",
+                    getAverageScore(),
+                    improved,
+                    performances.size());
+        }
+    }
+
+    // =========================
+    // LEARNING MONITOR CLASS
+    // =========================
+
+    static class LearningMonitor {
+
+        private final List<Student> students;
+
+        public LearningMonitor() {
+            this.students = new ArrayList<>();
+        }
+
+        public boolean registerStudent(Student student) {
+            if (findStudent(student.getStudentId()) != null) {
+                return false;
+            }
+
+            students.add(student);
+            return true;
+        }
+
+        public Student findStudent(String studentId) {
+            for (Student student : students) {
+                if (student.getStudentId()
+                        .equalsIgnoreCase(studentId)) {
+
+                    return student;
+                }
+            }
+
+            return null;
+        }
+
+        public List<Student> getStudents() {
+            return new ArrayList<>(students);
+        }
+
+        public List<LearningResource> getRecommendations(
+                Student student) {
+
+            List<LearningResource> recommendations =
+                    new ArrayList<>();
+
+            for (ConceptPerformance performance
+                    : student.getPerformances()) {
+
+                if (performance.isWeakness()) {
+                    recommendations.add(
+                            createExplanation(
+                                    performance.getConcept()));
+
+                    recommendations.add(
+                            createPracticeActivity(
+                                    performance.getConcept()));
+                }
+            }
+
+            return recommendations;
+        }
+
+        private LearningResource createExplanation(
+                Concept concept) {
+
+            switch (concept) {
+                case LOOPS:
+                    return new ExplanationResource(
+                            "Understanding Loops",
+                            concept,
+                            "Loops repeat a block of code. "
+                            + "Use for when repetitions are known, "
+                            + "while when a condition is checked "
+                            + "before each repetition, and do while "
+                            + "when the body must run at least once.");
+
+                case ARRAYS:
+                    return new ExplanationResource(
+                            "Understanding Arrays",
+                            concept,
+                            "Arrays store multiple values of one type. "
+                            + "Indexes start at 0, and the last valid "
+                            + "index is array.length - 1.");
+
+                case METHODS:
+                    return new ExplanationResource(
+                            "Understanding Methods",
+                            concept,
+                            "Methods organize one responsibility. "
+                            + "Parameters receive data, while return "
+                            + "values allow the caller to reuse results.");
+
+                default:
+                    return new ExplanationResource(
+                            "Understanding Problem Solving",
+                            concept,
+                            "Break a problem into inputs, processing, "
+                            + "and outputs. Write pseudocode and test "
+                            + "small cases before improving the solution.");
+            }
+        }
+
+        private LearningResource createPracticeActivity(
+                Concept concept) {
+
+            switch (concept) {
+                case LOOPS:
+                    return new PracticeActivityResource(
+                            "Loop Tracing Practice",
+                            concept,
+                            "Write a for loop that prints even "
+                            + "numbers from 2 to 20. Trace the counter "
+                            + "and condition for every iteration.");
+
+                case ARRAYS:
+                    return new PracticeActivityResource(
+                            "Array Processing Practice",
+                            concept,
+                            "Create an int array of five scores. "
+                            + "Calculate the total and average without "
+                            + "accessing an invalid index.");
+
+                case METHODS:
+                    return new PracticeActivityResource(
+                            "Method Design Practice",
+                            concept,
+                            "Write a method named findLargest that "
+                            + "receives an int array and returns its "
+                            + "largest value.");
+
+                default:
+                    return new PracticeActivityResource(
+                            "Problem Decomposition Practice",
+                            concept,
+                            "Design a grade calculator. List the "
+                            + "inputs, processing steps, outputs, "
+                            + "and three test cases.");
+            }
+        }
+    }
+}
+
